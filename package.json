@@ -5,6 +5,7 @@
   "description": "Multi-Vendor Headless E-Commerce & Omnichannel Storefront with Stripe Connect & MeiliSearch",
   "main": "server.js",
   "scripts": {
+    "build": "node build.js",
     "dev": "node server.js",
     "start": "node server.js",
     "serve": "node server.js"
