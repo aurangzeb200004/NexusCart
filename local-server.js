@@ -85,3 +85,4 @@ if (require.main === module) {
   process.on('SIGTERM', () => server.close());
   process.on('SIGINT', () => server.close());
 }
+

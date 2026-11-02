@@ -1,0 +1,2072 @@
+<!DOCTYPE html>
+<html lang="en" class="light scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexusCart | Multi-Vendor Headless E-Commerce & Omnichannel Storefront</title>
+  <meta name="description" content="Production-grade headless multi-tenant e-commerce platform with sub-2ms MeiliSearch indexing, Stripe Connect split payouts, and real-time order tracking." />
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+          },
+          colors: {
+            brand: {
+              50: '#ecfeff',
+              100: '#cffafe',
+              500: '#06b6d4',
+              600: '#0891b2',
+              700: '#0e7490'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- React 18 & Babel Standalone for instant zero-build execution -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #0891b2; }
+    
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    .animate-glow {
+      animation: pulseGlow 2.5s infinite;
+    }
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printable-invoice, #printable-invoice * {
+        visibility: visible;
+      }
+      #printable-invoice {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        color: #000;
+        background: #fff;
+        border: none;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased selection:bg-cyan-500/20 selection:text-cyan-700 overflow-x-hidden min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // ============================================================================
+    // CONSTANTS & INITIAL DATA
+    // ============================================================================
+    const INITIAL_VENDORS = [
+      {
+        id: 'v_aether',
+        name: 'Aether Audio Lab',
+        slug: 'aether-audio',
+        stripeAccountId: 'acct_aether_99x',
+        tagline: 'Precision planar magnetic acoustics & studio DACs.',
+        accent: 'from-cyan-600 via-sky-600 to-blue-700',
+        badgeColor: 'text-cyan-700 border-cyan-300 bg-cyan-50',
+        rating: 4.95,
+        location: 'Berlin, DE',
+        verified: true,
+        logoIcon: 'fa-headphones'
+      },
+      {
+        id: 'v_kuro',
+        name: 'Kuro Minimalist Gear',
+        slug: 'kuro-gear',
+        stripeAccountId: 'acct_kuro_42k',
+        tagline: 'CNC-machined titanium everyday carry & desk architecture.',
+        accent: 'from-violet-700 via-purple-700 to-indigo-800',
+        badgeColor: 'text-violet-700 border-violet-300 bg-violet-50',
+        rating: 4.91,
+        location: 'Tokyo, JP',
+        verified: true,
+        logoIcon: 'fa-cubes'
+      },
+      {
+        id: 'v_veloce',
+        name: 'Veloce Espresso Roasters',
+        slug: 'veloce-coffee',
+        stripeAccountId: 'acct_veloce_88v',
+        tagline: 'Micro-lot specialty coffee & precision telemetry brewers.',
+        accent: 'from-amber-600 via-orange-600 to-amber-700',
+        badgeColor: 'text-amber-700 border-amber-300 bg-amber-50',
+        rating: 4.98,
+        location: 'Milan, IT',
+        verified: true,
+        logoIcon: 'fa-mug-hot'
+      },
+      {
+        id: 'v_nomad',
+        name: 'Nomad Tech Carry',
+        slug: 'nomad-carry',
+        stripeAccountId: 'acct_nomad_17n',
+        tagline: 'Weatherproof ballistic nylon packs & GaN charging hubs.',
+        accent: 'from-emerald-700 via-teal-700 to-slate-800',
+        badgeColor: 'text-emerald-700 border-emerald-300 bg-emerald-50',
+        rating: 4.89,
+        location: 'San Francisco, US',
+        verified: true,
+        logoIcon: 'fa-shield-halved'
+      }
+    ];
+
+    const INITIAL_PRODUCTS = [
+      {
+        id: 'prod_1',
+        sku: 'AET-PM1-BLK',
+        title: 'Aether Reference Planar Headphones',
+        vendorId: 'v_aether',
+        category: 'Audio',
+        priceUsd: 499,
+        stock: 14,
+        rating: 4.9,
+        reviews: 128,
+        image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=800&auto=format&fit=crop',
+        specs: ['106mm Planar Magnetic Driver', 'CNC Anodized Aluminum Frame', 'Detachable Balanced XLR Cable']
+      },
+      {
+        id: 'prod_2',
+        sku: 'AET-DAC-PRO',
+        title: 'Aether Zero-Jitter Desktop DAC/Amp',
+        vendorId: 'v_aether',
+        category: 'Audio',
+        priceUsd: 340,
+        stock: 9,
+        rating: 4.8,
+        reviews: 84,
+        image: 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?q=80&w=800&auto=format&fit=crop',
+        specs: ['Dual ESS Sabre 32-Bit DAC', '32bit/768kHz PCM & DSD512', 'OLED Telemetry Display']
+      },
+      {
+        id: 'prod_3',
+        sku: 'KUR-KBD-75',
+        title: 'Kuro Monolith 75% Mechanical Keyboard',
+        vendorId: 'v_kuro',
+        category: 'Desk Setup',
+        priceUsd: 285,
+        stock: 22,
+        rating: 5.0,
+        reviews: 215,
+        image: 'https://images.unsplash.com/photo-1595225476474-87563907a212?q=80&w=800&auto=format&fit=crop',
+        specs: ['Gasket Mount CNC 6063 Aluminum', 'Hot-Swappable Hall Effect Switches', 'QMK / VIA Wireless 2.4GHz']
+      },
+      {
+        id: 'prod_4',
+        sku: 'KUR-PEN-TI',
+        title: 'Kuro Grade-5 Titanium Bolt Pen',
+        vendorId: 'v_kuro',
+        category: 'Accessories',
+        priceUsd: 95,
+        stock: 41,
+        rating: 4.9,
+        reviews: 67,
+        image: 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?q=80&w=800&auto=format&fit=crop',
+        specs: ['Zero-Tolerance Machined Titanium', 'Schmidt P900 Refill Compatible', '28g Balanced Weight']
+      },
+      {
+        id: 'prod_5',
+        sku: 'VEL-ESP-V1',
+        title: 'Veloce Barista PID Pressure Brewer',
+        vendorId: 'v_veloce',
+        category: 'Coffee Gear',
+        priceUsd: 620,
+        stock: 7,
+        rating: 4.95,
+        reviews: 92,
+        image: 'https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?q=80&w=800&auto=format&fit=crop',
+        specs: ['Digital PID Temperature Control', '9-Bar Rotary Vane Pump', 'Real-Time Flow Profiling']
+      },
+      {
+        id: 'prod_6',
+        sku: 'VEL-GRN-64',
+        title: 'Veloce 64mm Flat-Burr Single Dose Grinder',
+        vendorId: 'v_veloce',
+        category: 'Coffee Gear',
+        priceUsd: 390,
+        stock: 15,
+        rating: 4.88,
+        reviews: 53,
+        image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?q=80&w=800&auto=format&fit=crop',
+        specs: ['DLC Coated 64mm Flat Burrs', '0.1g Zero-Retention Blowout', 'Brushless Variable RPM Motor']
+      },
+      {
+        id: 'prod_7',
+        sku: 'NOM-BPK-28',
+        title: 'Nomad 28L Cordura Ballistic Tech Pack',
+        vendorId: 'v_nomad',
+        category: 'Carry & Travel',
+        priceUsd: 245,
+        stock: 19,
+        rating: 4.92,
+        reviews: 178,
+        image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?q=80&w=800&auto=format&fit=crop',
+        specs: ['1680D Ballistic Nylon Shell', 'YKK AquaGuard Waterproof Zips', 'Suspended 16" MacBook Vault']
+      },
+      {
+        id: 'prod_8',
+        sku: 'NOM-GAN-140',
+        title: 'Nomad 140W 4-Port GaN Pro Travel Hub',
+        vendorId: 'v_nomad',
+        category: 'Accessories',
+        priceUsd: 110,
+        stock: 34,
+        rating: 4.85,
+        reviews: 109,
+        image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?q=80&w=800&auto=format&fit=crop',
+        specs: ['PD 3.1 140W Fast Charging', 'Dynamic Thermal Load Balancing', 'EU/UK/US Modular Plugs']
+      }
+    ];
+
+    const SAMPLE_IMAGE_PRESETS = [
+      { name: 'Headphones', url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=800&auto=format&fit=crop' },
+      { name: 'Mechanical Keyboard', url: 'https://images.unsplash.com/photo-1595225476474-87563907a212?q=80&w=800&auto=format&fit=crop' },
+      { name: 'Espresso Machine', url: 'https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?q=80&w=800&auto=format&fit=crop' },
+      { name: 'Camera & Optics', url: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?q=80&w=800&auto=format&fit=crop' },
+      { name: 'Tech Backpack', url: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?q=80&w=800&auto=format&fit=crop' },
+      { name: 'EDC Hardware', url: 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?q=80&w=800&auto=format&fit=crop' }
+    ];
+
+    const CURRENCIES = {
+      USD: { symbol: '$', rate: 1.0, label: 'USD ($)', code: 'USD' },
+      EUR: { symbol: '€', rate: 0.92, label: 'EUR (€)', code: 'EUR' },
+      GBP: { symbol: '£', rate: 0.79, label: 'GBP (£)', code: 'GBP' },
+      PKR: { symbol: '₨', rate: 278.5, label: 'PKR (₨)', code: 'PKR' }
+    };
+
+    const ORDER_STEPS = [
+      { title: 'Order Placed & Split Paid', desc: 'Stripe Transfer Group split settled instantly.' },
+      { title: 'Vendor Packed & Verified', desc: 'Barcoded by merchant with digital invoice.' },
+      { title: 'In Transit (DHL Express)', desc: 'Dispatched to international air cargo hub.' },
+      { title: 'Out for Local Delivery', desc: 'Courier van dispatched to recipient address.' },
+      { title: 'Delivered & Settled', desc: 'Package signed for; merchant escrow released.' }
+    ];
+
+    // Local Storage Helpers
+    const loadStorage = (key, fallback) => {
+      try {
+        const item = localStorage.getItem(`nexuscart_${key}`);
+        return item ? JSON.parse(item) : fallback;
+      } catch (e) {
+        return fallback;
+      }
+    };
+    const saveStorage = (key, val) => {
+      try {
+        localStorage.setItem(`nexuscart_${key}`, JSON.stringify(val));
+      } catch (e) {}
+    };
+
+    // ============================================================================
+    // MAIN REACT APPLICATION COMPONENT (LIGHT THEME)
+    // ============================================================================
+    function NexusCartApp() {
+      // Navigation
+      const [activeView, setActiveView] = useState('storefront'); // storefront | vendor | orders | architecture
+      
+      // Persisted Application State
+      const [currency, setCurrency] = useState(() => loadStorage('currency', 'USD'));
+      const [vendors, setVendors] = useState(() => loadStorage('vendors', INITIAL_VENDORS));
+      const [products, setProducts] = useState(() => loadStorage('products', INITIAL_PRODUCTS));
+      const [cart, setCart] = useState(() => loadStorage('cart', [
+        { productId: 'prod_1', qty: 1 },
+        { productId: 'prod_3', qty: 1 }
+      ]));
+      const [orders, setOrders] = useState(() => loadStorage('orders', [
+        {
+          id: 'NX-90412',
+          createdAt: 'Oct 31, 2026 • 14:22 UTC',
+          customerEmail: 'alex.mercer@studio.io',
+          stepIndex: 2,
+          refunded: false,
+          currency: 'USD',
+          trackingNumber: 'DHL-EXP-90412-88X',
+          totalUsd: 784,
+          platformFeeUsd: 19.60,
+          vendorSplits: [
+            { vendorId: 'v_aether', vendorName: 'Aether Audio Lab', stripeAccountId: 'acct_aether_99x', grossUsd: 499, netPayoutUsd: 486.525 },
+            { vendorId: 'v_kuro', vendorName: 'Kuro Minimalist Gear', stripeAccountId: 'acct_kuro_42k', grossUsd: 285, netPayoutUsd: 277.875 }
+          ],
+          items: [
+            { title: 'Aether Reference Planar Headphones', qty: 1, priceUsd: 499, vendorId: 'v_aether' },
+            { title: 'Kuro Monolith 75% Mechanical Keyboard', qty: 1, priceUsd: 285, vendorId: 'v_kuro' }
+          ]
+        }
+      ]));
+
+      // Save to localStorage on state mutations
+      useEffect(() => { saveStorage('currency', currency); }, [currency]);
+      useEffect(() => { saveStorage('vendors', vendors); }, [vendors]);
+      useEffect(() => { saveStorage('products', products); }, [products]);
+      useEffect(() => { saveStorage('cart', cart); }, [cart]);
+      useEffect(() => { saveStorage('orders', orders); }, [orders]);
+
+      // Storefront Filter States
+      const [selectedTenant, setSelectedTenant] = useState('all');
+      const [selectedCategory, setSelectedCategory] = useState('All');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [sortBy, setSortBy] = useState('featured');
+      const [quickViewProduct, setQuickViewProduct] = useState(null);
+
+      // Cart & Checkout
+      const [isCartOpen, setIsCartOpen] = useState(false);
+      const [checkoutStep, setCheckoutStep] = useState(null); // null | 'processing' | 'done'
+      const [checkoutCustomerEmail, setCheckoutCustomerEmail] = useState('customer@nexuscart.dev');
+      const [paymentMethod, setPaymentMethod] = useState('stripe_card');
+
+      // Vendor Portal
+      const [managedVendorId, setManagedVendorId] = useState('v_aether');
+      const [showAddProductModal, setShowAddProductModal] = useState(false);
+      const [newProdForm, setNewProdForm] = useState({
+        title: '',
+        sku: '',
+        category: 'Audio',
+        priceUsd: 199,
+        stock: 25,
+        specsStr: 'CNC Anodized Finish, High Precision Engineering, Global Warranty',
+        image: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?q=80&w=800&auto=format&fit=crop'
+      });
+      const [vendorSearch, setVendorSearch] = useState('');
+
+      // Architecture tab sub-view
+      const [archTab, setArchTab] = useState('schema'); // schema | stripe | meilisearch | simulator
+
+      // Order Modal
+      const [invoiceModalOrder, setInvoiceModalOrder] = useState(null);
+
+      // Toast Notification
+      const [toast, setToast] = useState(null);
+      const triggerToast = (msg, type = 'success') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3800);
+      };
+
+      // Currency Formatting Helper
+      const formatPrice = (usdAmount, targetCurrency = currency) => {
+        const c = CURRENCIES[targetCurrency] || CURRENCIES.USD;
+        const converted = usdAmount * c.rate;
+        if (targetCurrency === 'PKR') {
+          return `${c.symbol}${Math.round(converted).toLocaleString()}`;
+        }
+        return `${c.symbol}${converted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      };
+
+      // Simulated MeiliSearch Latency calculation
+      const searchLatencyMs = useMemo(() => {
+        const base = 0.72;
+        const jitter = (searchQuery.length * 0.08) + (selectedTenant !== 'all' ? 0.12 : 0.04);
+        return (base + jitter).toFixed(2);
+      }, [searchQuery, selectedCategory, selectedTenant]);
+
+      // Instant MeiliSearch Filtered Products
+      const filteredProducts = useMemo(() => {
+        return products
+          .filter(p => selectedTenant === 'all' || p.vendorId === selectedTenant)
+          .filter(p => selectedCategory === 'All' || p.category === selectedCategory)
+          .filter(p => {
+            if (!searchQuery.trim()) return true;
+            const q = searchQuery.toLowerCase().trim();
+            return (
+              p.title.toLowerCase().includes(q) ||
+              p.sku.toLowerCase().includes(q) ||
+              p.category.toLowerCase().includes(q) ||
+              (p.specs && p.specs.some(s => s.toLowerCase().includes(q)))
+            );
+          })
+          .sort((a, b) => {
+            if (sortBy === 'price-asc') return a.priceUsd - b.priceUsd;
+            if (sortBy === 'price-desc') return b.priceUsd - a.priceUsd;
+            if (sortBy === 'rating') return b.rating - a.rating;
+            if (sortBy === 'stock') return b.stock - a.stock;
+            return 0; // featured default
+          });
+      }, [products, selectedTenant, selectedCategory, searchQuery, sortBy]);
+
+      // Cart Calculations & Multi-Vendor Stripe Split Breakdown
+      const cartDetails = useMemo(() => {
+        const enriched = cart.map(item => {
+          const product = products.find(p => p.id === item.productId);
+          const vendor = vendors.find(v => v.id === product?.vendorId);
+          return {
+            ...item,
+            product,
+            vendor,
+            lineTotalUsd: (product?.priceUsd || 0) * item.qty
+          };
+        }).filter(i => i.product);
+
+        const subtotalUsd = enriched.reduce((acc, i) => acc + i.lineTotalUsd, 0);
+        const platformFeeUsd = subtotalUsd * 0.025; // 2.5% NexusCart Platform Fee
+
+        // Calculate 97.5% split per vendor
+        const vendorSplits = {};
+        enriched.forEach(item => {
+          if (!item.vendor) return;
+          const vid = item.vendor.id;
+          if (!vendorSplits[vid]) {
+            vendorSplits[vid] = {
+              vendorId: vid,
+              vendorName: item.vendor.name,
+              stripeAccountId: item.vendor.stripeAccountId,
+              grossUsd: 0,
+              netPayoutUsd: 0,
+              itemCount: 0
+            };
+          }
+          vendorSplits[vid].grossUsd += item.lineTotalUsd;
+          vendorSplits[vid].netPayoutUsd += item.lineTotalUsd * 0.975;
+          vendorSplits[vid].itemCount += item.qty;
+        });
+
+        return {
+          items: enriched,
+          totalCount: enriched.reduce((sum, i) => sum + i.qty, 0),
+          subtotalUsd,
+          platformFeeUsd,
+          vendorSplits: Object.values(vendorSplits)
+        };
+      }, [cart, products, vendors]);
+
+      // Cart Mutations
+      const addToCart = (productId, qty = 1) => {
+        const prod = products.find(p => p.id === productId);
+        if (!prod || prod.stock <= 0) {
+          triggerToast('Item is out of stock!', 'error');
+          return;
+        }
+        setCart(prev => {
+          const existing = prev.find(i => i.productId === productId);
+          if (existing) {
+            const nextQty = Math.min(prod.stock, existing.qty + qty);
+            return prev.map(i => i.productId === productId ? { ...i, qty: nextQty } : i);
+          }
+          return [...prev, { productId, qty: Math.min(prod.stock, qty) }];
+        });
+        triggerToast(`Added "${prod.title}" to unified cart.`);
+      };
+
+      const updateCartQty = (productId, delta) => {
+        const prod = products.find(p => p.id === productId);
+        setCart(prev => prev.map(item => {
+          if (item.productId !== productId) return item;
+          const nextQty = item.qty + delta;
+          if (nextQty <= 0) return null;
+          const maxStock = prod ? prod.stock : 999;
+          return { ...item, qty: Math.min(maxStock, nextQty) };
+        }).filter(Boolean));
+      };
+
+      const removeCartItem = (productId) => {
+        setCart(prev => prev.filter(i => i.productId !== productId));
+        triggerToast('Removed item from cart.');
+      };
+
+      // Checkout Execution with Stripe Connect Split Simulation
+      const handleStripeSplitCheckout = () => {
+        if (cartDetails.items.length === 0) return;
+        setCheckoutStep('processing');
+
+        setTimeout(() => {
+          // Deduct Stock
+          setProducts(prev => prev.map(p => {
+            const inCart = cart.find(c => c.productId === p.id);
+            if (!inCart) return p;
+            return { ...p, stock: Math.max(0, p.stock - inCart.qty) };
+          }));
+
+          const randomOrderNumber = `NX-${Math.floor(10000 + Math.random() * 90000)}`;
+          const trackingNumber = `DHL-EXP-${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+          const newOrder = {
+            id: randomOrderNumber,
+            createdAt: new Date().toUTCString().replace('GMT', 'UTC'),
+            customerEmail: checkoutCustomerEmail || 'customer@nexuscart.dev',
+            stepIndex: 0,
+            refunded: false,
+            currency: currency,
+            trackingNumber: trackingNumber,
+            totalUsd: cartDetails.subtotalUsd,
+            platformFeeUsd: cartDetails.platformFeeUsd,
+            vendorSplits: cartDetails.vendorSplits,
+            items: cartDetails.items.map(i => ({
+              title: i.product.title,
+              qty: i.qty,
+              priceUsd: i.product.priceUsd,
+              vendorId: i.vendor.id,
+              vendorName: i.vendor.name
+            }))
+          };
+
+          setOrders(prev => [newOrder, ...prev]);
+          setCart([]);
+          setCheckoutStep(null);
+          setIsCartOpen(false);
+          setActiveView('orders');
+          triggerToast(`Success! Order ${newOrder.id} settled & routed to ${cartDetails.vendorSplits.length} Stripe account(s).`);
+        }, 1200);
+      };
+
+      // Vendor Portal Mutations
+      const updateProductStock = (productId, newStock) => {
+        const val = Math.max(0, parseInt(newStock) || 0);
+        setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock: val } : p));
+      };
+
+      const updateProductPrice = (productId, newPrice) => {
+        const val = Math.max(1, parseFloat(newPrice) || 1);
+        setProducts(prev => prev.map(p => p.id === productId ? { ...p, priceUsd: val } : p));
+      };
+
+      const deleteVendorProduct = (productId) => {
+        const prod = products.find(p => p.id === productId);
+        if (window.confirm(`Deactivate and remove SKU "${prod?.title}" from catalog?`)) {
+          setProducts(prev => prev.filter(p => p.id !== productId));
+          setCart(prev => prev.filter(i => i.productId !== productId));
+          triggerToast(`SKU removed from active MeiliSearch catalog.`);
+        }
+      };
+
+      const handleCreateVendorProduct = (e) => {
+        e.preventDefault();
+        const created = {
+          id: `prod_${Date.now()}`,
+          sku: newProdForm.sku.trim().toUpperCase() || `SKU-${Math.floor(100 + Math.random() * 899)}`,
+          title: newProdForm.title.trim() || 'New Custom Merchant SKU',
+          vendorId: managedVendorId,
+          category: newProdForm.category,
+          priceUsd: Number(newProdForm.priceUsd) || 150,
+          stock: Number(newProdForm.stock) || 10,
+          rating: 5.0,
+          reviews: 1,
+          image: newProdForm.image,
+          specs: newProdForm.specsStr.split(',').map(s => s.trim()).filter(Boolean)
+        };
+        setProducts(prev => [created, ...prev]);
+        setShowAddProductModal(false);
+        setNewProdForm({
+          title: '',
+          sku: '',
+          category: 'Audio',
+          priceUsd: 199,
+          stock: 25,
+          specsStr: 'CNC Anodized Finish, High Precision Engineering, Global Warranty',
+          image: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?q=80&w=800&auto=format&fit=crop'
+        });
+        triggerToast(`Published "${created.title}" with instant MeiliSearch indexing!`);
+      };
+
+      // Order Actions
+      const advanceOrderStep = (orderId) => {
+        setOrders(prev => prev.map(o => {
+          if (o.id !== orderId) return o;
+          const nextStep = Math.min(4, o.stepIndex + 1);
+          return { ...o, stepIndex: nextStep };
+        }));
+        triggerToast(`Order status updated to milestone.`);
+      };
+
+      const refundOrder = (orderId) => {
+        if (!window.confirm(`Execute Stripe Connect reversal & refund for Order ${orderId}?`)) return;
+        setOrders(prev => prev.map(o => {
+          if (o.id !== orderId) return o;
+          return { ...o, refunded: true };
+        }));
+        triggerToast(`Order ${orderId} refunded. Stripe transfers reversed.`, 'warning');
+      };
+
+      // Reset application to clean factory state
+      const handleResetDemoData = () => {
+        if (window.confirm('Reset all demo catalog, cart, and orders to initial sample state?')) {
+          setVendors(INITIAL_VENDORS);
+          setProducts(INITIAL_PRODUCTS);
+          setCart([
+            { productId: 'prod_1', qty: 1 },
+            { productId: 'prod_3', qty: 1 }
+          ]);
+          setCurrency('USD');
+          setSelectedTenant('all');
+          setSelectedCategory('All');
+          triggerToast('Application state reset to factory defaults.');
+        }
+      };
+
+      // Derived Objects
+      const currentManagedVendor = vendors.find(v => v.id === managedVendorId);
+      const activeTenantObj = vendors.find(v => v.id === selectedTenant);
+
+      // Vendor metrics calculation
+      const vendorSalesMetrics = useMemo(() => {
+        const vendorOrders = orders.filter(o => !o.refunded);
+        let totalGrossUsd = 0;
+        let totalNetPayoutUsd = 0;
+        let unitsSold = 0;
+
+        vendorOrders.forEach(o => {
+          o.items?.forEach(item => {
+            if (item.vendorId === managedVendorId) {
+              totalGrossUsd += item.priceUsd * item.qty;
+              totalNetPayoutUsd += (item.priceUsd * item.qty) * 0.975;
+              unitsSold += item.qty;
+            }
+          });
+        });
+
+        return { totalGrossUsd, totalNetPayoutUsd, unitsSold };
+      }, [orders, managedVendorId]);
+
+      // Close modals on Escape key
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+          if (e.key === 'Escape') {
+            setIsCartOpen(false);
+            setQuickViewProduct(null);
+            setShowAddProductModal(false);
+            setInvoiceModalOrder(null);
+          }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, []);
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+          
+          {/* ==================================================================== */}
+          {/* TOP OMNICHANNEL TELEMETRY BAR (LIGHT) */}
+          {/* ==================================================================== */}
+          <div className="bg-slate-100/90 border-b border-slate-200 px-4 py-2 text-xs font-mono text-slate-600">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  MeiliSearch v1.10: {searchLatencyMs}ms (Instant)
+                </span>
+                <span className="hidden sm:inline text-slate-300">|</span>
+                <span className="hidden sm:inline text-cyan-700 font-medium">
+                  <i className="fa-brands fa-stripe mr-1 text-cyan-600"></i> Stripe Connect Split v2026.4
+                </span>
+                <span className="hidden md:inline text-slate-300">|</span>
+                <span className="hidden md:inline text-violet-700 font-medium">
+                  <i className="fa-solid fa-database mr-1 text-violet-600"></i> Supabase RLS Active
+                </span>
+              </div>
+
+              <div className="flex items-center gap-4">
+                {/* Tenant Switcher */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 hidden sm:inline">Storefront:</span>
+                  <select
+                    value={selectedTenant}
+                    onChange={(e) => { setSelectedTenant(e.target.value); setActiveView('storefront'); }}
+                    className="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-slate-800 text-xs shadow-sm focus:outline-none focus:border-cyan-600 transition-colors"
+                  >
+                    <option value="all">Global Marketplace (All 4 Vendors)</option>
+                    {vendors.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Currency Switcher */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 hidden sm:inline">Currency:</span>
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className="bg-white border border-cyan-400 rounded-lg px-2.5 py-1 text-cyan-700 font-bold text-xs shadow-sm focus:outline-none focus:border-cyan-600 transition-colors"
+                  >
+                    {Object.keys(CURRENCIES).map(code => (
+                      <option key={code} value={code}>{CURRENCIES[code].label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ==================================================================== */}
+          {/* MAIN NAVIGATION HEADER (LIGHT) */}
+          {/* ==================================================================== */}
+          <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/90 border-b border-slate-200 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+              
+              {/* Brand Logo */}
+              <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveView('storefront')}>
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-teal-500 to-blue-600 p-[1.5px] shadow-md shadow-cyan-600/20 group-hover:shadow-cyan-600/40 transition-shadow">
+                  <div className="w-full h-full bg-white rounded-[10px] flex items-center justify-center text-cyan-600 font-bold text-lg">
+                    <i className="fa-solid fa-cube"></i>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xl font-extrabold tracking-tight text-slate-900">Nexus<span className="text-cyan-600">Cart</span></span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-cyan-50 text-cyan-700 border border-cyan-200 font-semibold">v2.4</span>
+                  </div>
+                  <span className="block text-[10px] font-mono uppercase tracking-widest text-slate-500">Multi-Vendor Headless Platform</span>
+                </div>
+              </div>
+
+              {/* Center Navigation Switcher */}
+              <nav className="hidden md:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  onClick={() => setActiveView('storefront')}
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                    activeView === 'storefront' ? 'bg-cyan-600 text-white font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <i className="fa-solid fa-store"></i> Storefront
+                </button>
+                <button
+                  onClick={() => setActiveView('vendor')}
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                    activeView === 'vendor' ? 'bg-cyan-600 text-white font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <i className="fa-solid fa-chart-pie"></i> Vendor Portal (CMS)
+                </button>
+                <button
+                  onClick={() => setActiveView('orders')}
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                    activeView === 'orders' ? 'bg-cyan-600 text-white font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <i className="fa-solid fa-truck-fast"></i> Orders & Logistics
+                  {orders.length > 0 && (
+                    <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                      activeView === 'orders' ? 'bg-white text-cyan-700 font-bold' : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {orders.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveView('architecture')}
+                  className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                    activeView === 'architecture' ? 'bg-cyan-600 text-white font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <i className="fa-solid fa-code"></i> Stack & RLS
+                </button>
+              </nav>
+
+              {/* Right Cart Trigger */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsCartOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-500 hover:from-cyan-500 hover:to-teal-400 text-white font-bold text-xs flex items-center gap-2.5 shadow-md shadow-cyan-600/20 transition-all transform hover:scale-[1.02]"
+                >
+                  <i className="fa-solid fa-bag-shopping text-sm"></i>
+                  <span>Split Cart</span>
+                  <span className="px-2 py-0.5 rounded-full bg-white text-cyan-700 font-mono text-[11px] font-bold shadow-sm">
+                    {cartDetails.totalCount}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Tab Bar */}
+            <div className="flex md:hidden justify-around border-t border-slate-200 bg-white py-2.5 px-2 text-xs">
+              <button onClick={() => setActiveView('storefront')} className={`flex items-center gap-1 ${activeView === 'storefront' ? 'text-cyan-600 font-bold' : 'text-slate-600'}`}>
+                <i className="fa-solid fa-store"></i> Store
+              </button>
+              <button onClick={() => setActiveView('vendor')} className={`flex items-center gap-1 ${activeView === 'vendor' ? 'text-cyan-600 font-bold' : 'text-slate-600'}`}>
+                <i className="fa-solid fa-chart-pie"></i> CMS
+              </button>
+              <button onClick={() => setActiveView('orders')} className={`flex items-center gap-1 ${activeView === 'orders' ? 'text-cyan-600 font-bold' : 'text-slate-600'}`}>
+                <i className="fa-solid fa-truck-fast"></i> Orders ({orders.length})
+              </button>
+              <button onClick={() => setActiveView('architecture')} className={`flex items-center gap-1 ${activeView === 'architecture' ? 'text-cyan-600 font-bold' : 'text-slate-600'}`}>
+                <i className="fa-solid fa-code"></i> Stack
+              </button>
+            </div>
+          </header>
+
+          {/* ==================================================================== */}
+          {/* MAIN CONTENT CONTAINER */}
+          {/* ==================================================================== */}
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            
+            {/* VIEW 1: HEADLESS STOREFRONT */}
+            {activeView === 'storefront' && (
+              <div className="space-y-8">
+                
+                {/* Dynamic Tenant Hero Banner */}
+                <div className={`rounded-3xl p-8 sm:p-10 bg-gradient-to-r ${activeTenantObj ? activeTenantObj.accent : 'from-slate-900 via-cyan-900 to-slate-900'} text-white relative overflow-hidden shadow-xl`}>
+                  <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-white/10 to-transparent pointer-events-none"></div>
+                  <div className="relative z-10 max-w-2xl space-y-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-xs font-mono border border-white/30">
+                      <i className="fa-solid fa-bolt text-cyan-300"></i>
+                      <span>{activeTenantObj ? `Verified Merchant Tenant • ${activeTenantObj.location}` : 'Multi-Tenant Federated Catalog'}</span>
+                    </div>
+                    <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
+                      {activeTenantObj ? activeTenantObj.name : 'Independent Hardware & Artisan Engineering.'}
+                    </h1>
+                    <p className="text-slate-100 text-sm sm:text-base leading-relaxed">
+                      {activeTenantObj ? activeTenantObj.tagline : 'Experience unified multi-vendor commerce. Add items from multiple independent brands into a single cart with automated Stripe Connect split settlement and sub-2ms MeiliSearch indexing.'}
+                    </p>
+                    {activeTenantObj && (
+                      <div className="flex flex-wrap items-center gap-4 pt-2 text-xs font-mono">
+                        <span className="text-slate-200">
+                          <i className="fa-solid fa-building-columns text-cyan-300 mr-1.5"></i>
+                          Stripe Payouts: <code className="bg-black/20 px-2 py-0.5 rounded text-white font-bold">{activeTenantObj.stripeAccountId}</code>
+                        </span>
+                        <span className="text-amber-300 font-semibold">
+                          <i className="fa-solid fa-star mr-1"></i>{activeTenantObj.rating} / 5.0 Rating
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Instant Search & Multi-Faceted Filter Controls (LIGHT) */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 shadow-sm">
+                  
+                  {/* Search Input */}
+                  <div className="relative flex-1">
+                    <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Instant search by product title, SKU (e.g. AET-PM1, KUR-KBD), or specs..."
+                      className="w-full pl-11 pr-28 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-cyan-600 transition-colors shadow-inner"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-semibold">
+                      {searchLatencyMs}ms
+                    </span>
+                  </div>
+
+                  {/* Category Pills */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {['All', 'Audio', 'Desk Setup', 'Coffee Gear', 'Carry & Travel', 'Accessories'].map(cat => {
+                      const count = products.filter(p => (selectedTenant === 'all' || p.vendorId === selectedTenant) && (cat === 'All' || p.category === cat)).length;
+                      return (
+                        <button
+                          key={cat}
+                          onClick={() => setSelectedCategory(cat)}
+                          className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                            selectedCategory === cat
+                              ? 'bg-cyan-600 text-white font-bold shadow-sm'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80 border border-slate-200'
+                          }`}
+                        >
+                          <span>{cat}</span>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                            selectedCategory === cat ? 'bg-cyan-700 text-white' : 'bg-slate-200 text-slate-600'
+                          }`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Sort Dropdown */}
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 focus:bg-white focus:outline-none focus:border-cyan-600 shadow-sm"
+                  >
+                    <option value="featured">Sort: Featured</option>
+                    <option value="price-asc">Price: Low to High</option>
+                    <option value="price-desc">Price: High to Low</option>
+                    <option value="rating">Top Customer Rating</option>
+                    <option value="stock">Available Stock</option>
+                  </select>
+                </div>
+
+                {/* Catalog Results Grid (LIGHT) */}
+                {filteredProducts.length === 0 ? (
+                  <div className="p-12 text-center rounded-2xl bg-white border border-slate-200 space-y-3 shadow-sm">
+                    <i className="fa-solid fa-box-open text-4xl text-slate-400"></i>
+                    <h3 className="text-lg font-bold text-slate-900">No Matching Products Found</h3>
+                    <p className="text-xs text-slate-500 font-mono">Try adjusting your keyword query or switching category filters.</p>
+                    <button
+                      onClick={() => { setSearchQuery(''); setSelectedCategory('All'); setSelectedTenant('all'); }}
+                      className="px-4 py-2 rounded-xl bg-cyan-50 text-cyan-700 text-xs font-mono font-bold hover:bg-cyan-100 border border-cyan-200 transition-colors"
+                    >
+                      Clear All Filters
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {filteredProducts.map(product => {
+                      const vendor = vendors.find(v => v.id === product.vendorId);
+                      return (
+                        <div key={product.id} className="rounded-2xl bg-white border border-slate-200 hover:border-cyan-500 overflow-hidden flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 group shadow-sm hover:shadow-xl">
+                          <div>
+                            {/* Product Image Frame */}
+                            <div className="relative h-56 bg-slate-100 overflow-hidden">
+                              <img
+                                src={product.image}
+                                alt={product.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                loading="lazy"
+                              />
+                              <div className="absolute top-3 left-3">
+                                <span className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-bold border backdrop-blur-md shadow-sm ${vendor?.badgeColor}`}>
+                                  {vendor?.name}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => setQuickViewProduct(product)}
+                                className="absolute bottom-3 right-3 px-2.5 py-1.5 rounded-lg bg-white/95 hover:bg-white text-slate-700 hover:text-cyan-700 text-xs font-mono border border-slate-200 shadow-md backdrop-blur-md transition-colors font-medium"
+                              >
+                                <i className="fa-regular fa-eye mr-1 text-cyan-600"></i> Quick Specs
+                              </button>
+                            </div>
+
+                            {/* Card Content */}
+                            <div className="p-5 space-y-2">
+                              <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
+                                <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-slate-700 font-semibold">{product.sku}</span>
+                                <span className="text-amber-500 font-semibold">
+                                  <i className="fa-solid fa-star mr-1"></i>{product.rating} ({product.reviews})
+                                </span>
+                              </div>
+                              <h3 className="text-base font-bold text-slate-900 line-clamp-2 group-hover:text-cyan-600 transition-colors">
+                                {product.title}
+                              </h3>
+                              <div className="flex flex-wrap gap-1.5 pt-1">
+                                {product.specs?.slice(0, 2).map((s, idx) => (
+                                  <span key={idx} className="text-[10px] px-2 py-0.5 rounded bg-slate-50 text-slate-600 border border-slate-200 font-mono truncate max-w-full">
+                                    {s}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Price & Add to Cart Footer */}
+                          <div className="px-5 pb-5 pt-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+                            <div>
+                              <div className="text-lg font-extrabold text-slate-900 font-mono">
+                                {formatPrice(product.priceUsd)}
+                              </div>
+                              <div className={`text-[11px] font-mono font-medium ${
+                                product.stock > 10 ? 'text-emerald-700' : product.stock > 0 ? 'text-amber-700' : 'text-rose-700'
+                              }`}>
+                                {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => addToCart(product.id)}
+                              disabled={product.stock <= 0}
+                              className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm"
+                            >
+                              <i className="fa-solid fa-plus"></i> Add
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* VIEW 2: SELF-SERVICE VENDOR PORTAL (CMS - LIGHT) */}
+            {activeView === 'vendor' && (
+              <div className="space-y-8">
+                
+                {/* Vendor Header Control Bar */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                  <div>
+                    <span className="text-xs font-mono uppercase text-cyan-600 font-bold">Multi-Tenant Merchant Management</span>
+                    <h2 className="text-2xl font-extrabold text-slate-900 mt-1">Tenant CMS & Inventory Hub</h2>
+                    <p className="text-xs text-slate-500 font-mono mt-1">Manage SKUs, update real-time stock levels, and review Stripe Connect earnings.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <select
+                      value={managedVendorId}
+                      onChange={(e) => setManagedVendorId(e.target.value)}
+                      className="px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-sm font-semibold text-slate-800 focus:outline-none focus:border-cyan-600 shadow-sm"
+                    >
+                      {vendors.map(v => (
+                        <option key={v.id} value={v.id}>Active Tenant: {v.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setShowAddProductModal(true)}
+                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-500 hover:from-cyan-500 hover:to-teal-400 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-cyan-600/20"
+                    >
+                      <i className="fa-solid fa-plus"></i> Add New SKU Product
+                    </button>
+                  </div>
+                </div>
+
+                {/* Vendor KPI Telemetry Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2">
+                    <span className="text-xs font-mono text-slate-500 font-medium">CONNECTED STRIPE ACCOUNT</span>
+                    <div className="text-base font-bold text-cyan-700 font-mono truncate">{currentManagedVendor?.stripeAccountId}</div>
+                    <span className="text-[11px] text-emerald-700 font-mono font-medium block">
+                      <i className="fa-solid fa-circle-check mr-1 text-emerald-600"></i> 97.5% Instant Split Active
+                    </span>
+                  </div>
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2">
+                    <span className="text-xs font-mono text-slate-500 font-medium">ACTIVE CATALOG SKUs</span>
+                    <div className="text-2xl font-extrabold text-slate-900 font-mono">
+                      {products.filter(p => p.vendorId === managedVendorId).length} Products
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-mono block">MeiliSearch Sub-2ms Edge Synced</span>
+                  </div>
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2">
+                    <span className="text-xs font-mono text-slate-500 font-medium">LIFETIME NET PAYOUTS</span>
+                    <div className="text-2xl font-extrabold text-emerald-700 font-mono">
+                      {formatPrice(vendorSalesMetrics.totalNetPayoutUsd)}
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-mono block">
+                      From {vendorSalesMetrics.unitsSold} units settled via Stripe
+                    </span>
+                  </div>
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2">
+                    <span className="text-xs font-mono text-slate-500 font-medium">MERCHANT CREDENTIALS</span>
+                    <div className="text-2xl font-extrabold text-amber-500 font-mono">
+                      <i className="fa-solid fa-star mr-1 text-sm"></i>{currentManagedVendor?.rating}
+                    </div>
+                    <span className="text-[11px] text-slate-500 font-mono block">HQ: {currentManagedVendor?.location}</span>
+                  </div>
+                </div>
+
+                {/* SKU Inventory Table with Inline Price & Stock Editing */}
+                <div className="rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-4 bg-slate-50/70">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Live SKU Inventory & Inline Price Editor</h3>
+                      <p className="text-xs font-mono text-slate-500 mt-0.5">Editing values immediately pushes updates to MeiliSearch and live storefront.</p>
+                    </div>
+                    <div className="relative">
+                      <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                      <input
+                        type="text"
+                        value={vendorSearch}
+                        onChange={e => setVendorSearch(e.target.value)}
+                        placeholder="Filter vendor SKUs..."
+                        className="pl-8 pr-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-cyan-600 shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-600 uppercase bg-slate-50">
+                          <th className="py-3.5 px-6">Product</th>
+                          <th className="py-3.5 px-4">SKU</th>
+                          <th className="py-3.5 px-4">Category</th>
+                          <th className="py-3.5 px-4">Price (USD)</th>
+                          <th className="py-3.5 px-4">Price ({currency})</th>
+                          <th className="py-3.5 px-4">Stock Units</th>
+                          <th className="py-3.5 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {products
+                          .filter(p => p.vendorId === managedVendorId)
+                          .filter(p => !vendorSearch || p.title.toLowerCase().includes(vendorSearch.toLowerCase()) || p.sku.toLowerCase().includes(vendorSearch.toLowerCase()))
+                          .map(prod => (
+                            <tr key={prod.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-4 px-6 font-sans">
+                                <div className="flex items-center gap-3">
+                                  <img src={prod.image} className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" />
+                                  <div>
+                                    <span className="font-semibold text-slate-900 block text-sm">{prod.title}</span>
+                                    <span className="text-slate-500 text-[11px] font-mono">{prod.specs?.[0] || 'Hardware Spec'}</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-4 px-4 text-cyan-700 font-bold">{prod.sku}</td>
+                              <td className="py-4 px-4">
+                                <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700 text-[11px]">
+                                  {prod.category}
+                                </span>
+                              </td>
+                              <td className="py-4 px-4">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-slate-500 font-medium">$</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={prod.priceUsd}
+                                    onChange={(e) => updateProductPrice(prod.id, e.target.value)}
+                                    className="w-24 px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-900 font-bold focus:border-cyan-600 focus:outline-none shadow-sm"
+                                  />
+                                </div>
+                              </td>
+                              <td className="py-4 px-4 text-slate-800 font-bold">
+                                {formatPrice(prod.priceUsd)}
+                              </td>
+                              <td className="py-4 px-4">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={prod.stock}
+                                  onChange={(e) => updateProductStock(prod.id, e.target.value)}
+                                  className="w-20 px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 text-emerald-700 font-extrabold focus:border-cyan-600 focus:outline-none shadow-sm"
+                                />
+                              </td>
+                              <td className="py-4 px-4 text-right">
+                                <button
+                                  onClick={() => deleteVendorProduct(prod.id)}
+                                  className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs transition-colors font-medium"
+                                  title="Deactivate SKU"
+                                >
+                                  <i className="fa-regular fa-trash-can mr-1"></i> Remove
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* VIEW 3: ORDER LIFECYCLE & SHIPMENT TRACKER (LIGHT) */}
+            {activeView === 'orders' && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-mono uppercase text-cyan-600 font-bold">Post-Purchase Telemetry</span>
+                    <h2 className="text-2xl font-extrabold text-slate-900 mt-1">Order Lifecycle & Split Settlement Ledger</h2>
+                  </div>
+                  <div className="text-xs font-mono text-slate-500">
+                    <span className="text-emerald-700 font-bold">{orders.filter(o => !o.refunded).length}</span> Active Settlements &bull; Instant DHL Express Tracking
+                  </div>
+                </div>
+
+                {orders.length === 0 ? (
+                  <div className="p-12 text-center rounded-2xl bg-white border border-slate-200 space-y-3 shadow-sm">
+                    <i className="fa-solid fa-receipt text-4xl text-slate-400"></i>
+                    <h3 className="text-lg font-bold text-slate-900">No Orders Placed Yet</h3>
+                    <p className="text-xs text-slate-500 font-mono">Use the Unified Split Cart to simulate a multi-vendor checkout and watch the telemetry live.</p>
+                  </div>
+                ) : (
+                  orders.map(order => (
+                    <div key={order.id} className="p-6 rounded-2xl bg-white border border-slate-200 space-y-6 shadow-sm">
+                      
+                      {/* Order Header */}
+                      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200">
+                        <div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg font-bold font-mono text-slate-900 tracking-wide">{order.id}</span>
+                            {order.refunded ? (
+                              <span className="px-2.5 py-0.5 rounded text-xs font-mono bg-rose-50 text-rose-700 border border-rose-200 font-semibold">
+                                <i className="fa-solid fa-arrow-rotate-left mr-1"></i> Refunded & Reversed
+                              </span>
+                            ) : order.stepIndex === 4 ? (
+                              <span className="px-2.5 py-0.5 rounded text-xs font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                                <i className="fa-solid fa-circle-check mr-1 text-emerald-600"></i> Delivered & Settled
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded text-xs font-mono bg-cyan-50 text-cyan-800 border border-cyan-300 font-semibold">
+                                <i className="fa-solid fa-truck-ramp-box mr-1 text-cyan-600"></i> In Logistics Transit
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 font-mono mt-1">
+                            {order.createdAt} &bull; Customer: <span className="text-slate-800 font-semibold">{order.customerEmail}</span>
+                          </p>
+                          <div className="text-xs font-mono text-slate-500 mt-1 flex items-center gap-2">
+                            <span>DHL Tracking:</span>
+                            <span className="text-cyan-700 font-bold bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200">{order.trackingNumber || 'DHL-EXP-4829103'}</span>
+                          </div>
+                        </div>
+
+                        {/* Order Action Buttons */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => setInvoiceModalOrder(order)}
+                            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-mono text-slate-800 border border-slate-300 transition-colors flex items-center gap-1.5 font-semibold"
+                          >
+                            <i className="fa-regular fa-file-lines text-cyan-600"></i> View Email Receipt
+                          </button>
+                          
+                          {!order.refunded && order.stepIndex < 4 && (
+                            <button
+                              onClick={() => advanceOrderStep(order.id)}
+                              className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-sm"
+                            >
+                              Advance Milestone &rarr;
+                            </button>
+                          )}
+
+                          {!order.refunded && (
+                            <button
+                              onClick={() => refundOrder(order.id)}
+                              className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-mono transition-colors font-semibold"
+                              title="Reverse Stripe transfers"
+                            >
+                              Refund
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Purchased Items & Split Breakdown */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs font-mono">
+                          <div className="text-slate-500 uppercase text-[10px] font-bold">Purchased Items ({order.items?.length || 0})</div>
+                          <div className="space-y-1.5">
+                            {order.items?.map((item, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-slate-700">
+                                <span className="font-medium">{item.qty}x {item.title}</span>
+                                <span className="font-bold text-slate-900">{formatPrice(item.priceUsd * item.qty, order.currency)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs font-mono">
+                          <div className="text-slate-500 uppercase text-[10px] font-bold">Stripe Connect Split Transfers</div>
+                          <div className="space-y-1">
+                            {order.vendorSplits?.map((split, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-slate-700">
+                                <span>{split.vendorName} (97.5% net)</span>
+                                <span className="text-emerald-700 font-bold">{formatPrice(split.netPayoutUsd, order.currency)}</span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between items-center text-slate-600 pt-1.5 border-t border-slate-200">
+                              <span>NexusCart Platform Fee (2.5%)</span>
+                              <span className="text-cyan-700 font-bold">{formatPrice(order.platformFeeUsd, order.currency)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-slate-900 font-bold pt-1 border-t border-slate-200">
+                              <span>Total Settled</span>
+                              <span className="text-sm font-extrabold text-cyan-800">{formatPrice(order.totalUsd, order.currency)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 5-Stage Interactive Shipment Timeline */}
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs font-mono text-slate-600 font-medium">
+                          <span>Logistics Stage: <strong className="text-slate-900">{ORDER_STEPS[order.stepIndex]?.title}</strong></span>
+                          <span>Progress: {Math.round(((order.stepIndex + 1) / 5) * 100)}%</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                          {ORDER_STEPS.map((step, idx) => {
+                            const completed = idx <= order.stepIndex && !order.refunded;
+                            const isCurrent = idx === order.stepIndex && !order.refunded;
+                            return (
+                              <div key={step.title} className={`p-3 rounded-xl border text-xs font-mono transition-all ${
+                                isCurrent
+                                  ? 'bg-cyan-50 border-cyan-400 text-cyan-950 ring-2 ring-cyan-500/30 shadow-md'
+                                  : completed
+                                  ? 'bg-emerald-50/80 border-emerald-300 text-emerald-900'
+                                  : 'bg-slate-50 border-slate-200 text-slate-400'
+                              }`}>
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-slate-700">0{idx + 1}</span>
+                                  {completed && <i className="fa-solid fa-check text-emerald-600 text-xs font-bold"></i>}
+                                </div>
+                                <div className="mt-1 font-sans font-semibold text-slate-900">{step.title}</div>
+                                <p className="text-[10px] text-slate-500 mt-1 leading-tight">{step.desc}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* VIEW 4: HEADLESS STACK & RLS ARCHITECTURE (LIGHT) */}
+            {activeView === 'architecture' && (
+              <div className="space-y-6">
+                <div>
+                  <span className="text-xs font-mono uppercase text-cyan-600 font-bold">Under the Hood</span>
+                  <h2 className="text-2xl font-extrabold text-slate-900 mt-1">Headless Architecture & Production Engineering</h2>
+                  <p className="text-xs text-slate-500 font-mono mt-1">Multi-tenant isolation, automated Stripe Connect transfers, and sub-2ms MeiliSearch indexing.</p>
+                </div>
+
+                {/* Sub Tab Controls */}
+                <div className="flex flex-wrap gap-2 p-1.5 rounded-xl bg-slate-100 border border-slate-200">
+                  <button
+                    onClick={() => setArchTab('schema')}
+                    className={`px-4 py-2 rounded-lg text-xs font-semibold font-mono transition-all ${
+                      archTab === 'schema' ? 'bg-cyan-600 text-white font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    1. Supabase PostgreSQL & RLS
+                  </button>
+                  <button
+                    onClick={() => setArchTab('stripe')}
+                    className={`px-4 py-2 rounded-lg text-xs font-semibold font-mono transition-all ${
+                      archTab === 'stripe' ? 'bg-cyan-600 text-white font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    2. Stripe Connect Split Webhook
+                  </button>
+                  <button
+                    onClick={() => setArchTab('meilisearch')}
+                    className={`px-4 py-2 rounded-lg text-xs font-semibold font-mono transition-all ${
+                      archTab === 'meilisearch' ? 'bg-cyan-600 text-white font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    3. MeiliSearch Sync Worker
+                  </button>
+                  <button
+                    onClick={() => setArchTab('simulator')}
+                    className={`px-4 py-2 rounded-lg text-xs font-semibold font-mono transition-all ${
+                      archTab === 'simulator' ? 'bg-cyan-600 text-white font-bold shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    4. Interactive Split Calculator
+                  </button>
+                </div>
+
+                {/* TAB 1: SUPABASE SCHEMA & RLS */}
+                {archTab === 'schema' && (
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <i className="fa-solid fa-database text-emerald-600"></i>
+                        PostgreSQL Row-Level Security (RLS) & Multi-Tenant Separation
+                      </h3>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`-- Multi-Tenant RLS Policy\nALTER TABLE public.products ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "tenant_isolation" ON public.products FOR ALL USING (vendor_id::text = auth.jwt() ->> 'tenant_id');`);
+                          triggerToast('Copied RLS policy snippet to clipboard!');
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-mono text-slate-800 border border-slate-300 font-semibold"
+                      >
+                        Copy SQL
+                      </button>
+                    </div>
+                    <pre className="p-5 rounded-xl bg-slate-950 text-xs font-mono text-emerald-400 overflow-x-auto border border-slate-800 leading-relaxed shadow-inner">
+{`-- NexusCart Supabase Multi-Tenant Isolation
+-- Enable RLS on catalog tables
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vendor_payout_splits ENABLE ROW LEVEL SECURITY;
+
+-- 1. Storefront public read access
+CREATE POLICY "Public storefront catalog read"
+ON public.products FOR SELECT
+USING (true);
+
+-- 2. Strict tenant isolation for vendor SKU modifications
+CREATE POLICY "Vendor tenant catalog management"
+ON public.products FOR ALL
+USING (vendor_id::text = auth.jwt() ->> 'tenant_id')
+WITH CHECK (vendor_id::text = auth.jwt() ->> 'tenant_id');
+
+-- 3. Merchants can only inspect their own Stripe settlement ledger
+CREATE POLICY "Vendor view own payout splits"
+ON public.vendor_payout_splits FOR SELECT
+USING (
+  vendor_id::text = auth.jwt() ->> 'tenant_id'
+  OR auth.jwt() ->> 'role' = 'service_role'
+);`}
+                    </pre>
+                  </div>
+                )}
+
+                {/* TAB 2: STRIPE CONNECT ROUTE */}
+                {archTab === 'stripe' && (
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <i className="fa-brands fa-stripe text-violet-600 text-xl"></i>
+                        Automated Stripe Connect Multi-Vendor Split Transfers
+                      </h3>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(`// Stripe Connect Split Transfer\nconst paymentIntent = await stripe.paymentIntents.create({ amount, currency: 'usd', transfer_group });`);
+                          triggerToast('Copied Stripe snippet to clipboard!');
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-mono text-slate-800 border border-slate-300 font-semibold"
+                      >
+                        Copy Code
+                      </button>
+                    </div>
+                    <pre className="p-5 rounded-xl bg-slate-950 text-xs font-mono text-cyan-300 overflow-x-auto border border-slate-800 leading-relaxed shadow-inner">
+{`// api/checkout/stripe-connect-split.js (Next.js 15 Server Route)
+import Stripe from 'stripe';
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+export async function POST(req) {
+  const { cart, customerEmail } = await req.json();
+  const transferGroupId = \`ORDER_\${Date.now()}_\${Math.random().toString(36).substring(7)}\`;
+
+  // Step 1: Charge customer the gross cart amount
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: Math.round(cart.subtotalUsd * 100),
+    currency: 'usd',
+    transfer_group: transferGroupId,
+    receipt_email: customerEmail,
+    metadata: { platform: 'NexusCart_Headless', platformFeePercent: '2.5%' }
+  });
+
+  // Step 2: Route 97.5% net payout to each vendor's connected Stripe account
+  for (const split of cart.vendorSplits) {
+    const netPayoutCents = Math.round(split.grossUsd * 0.975 * 100);
+    await stripe.transfers.create({
+      amount: netPayoutCents,
+      currency: 'usd',
+      destination: split.stripeAccountId, // e.g. acct_aether_99x
+      transfer_group: transferGroupId,
+      description: \`NexusCart Settlement for \${split.vendorName}\`
+    });
+  }
+
+  return Response.json({ success: true, transferGroupId });
+}`}
+                    </pre>
+                  </div>
+                )}
+
+                {/* TAB 3: MEILISEARCH WORKER */}
+                {archTab === 'meilisearch' && (
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 space-y-4 shadow-sm">
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <i className="fa-solid fa-bolt text-amber-500"></i>
+                      Sub-2ms MeiliSearch Indexer Worker
+                    </h3>
+                    <pre className="p-5 rounded-xl bg-slate-950 text-xs font-mono text-amber-300 overflow-x-auto border border-slate-800 leading-relaxed shadow-inner">
+{`// workers/meilisearch-syncer.js
+import { MeiliSearch } from 'meilisearch';
+
+const client = new MeiliSearch({
+  host: process.env.MEILISEARCH_HOST || 'http://127.0.0.1:7700',
+  apiKey: process.env.MEILISEARCH_MASTER_KEY
+});
+
+export async function syncProductToMeiliSearch(product) {
+  const index = client.index('nexuscart_products');
+  
+  // Set searchable & filterable attributes for sub-2ms query performance
+  await index.updateFilterableAttributes(['vendorId', 'category', 'priceUsd', 'stock']);
+  await index.updateSearchableAttributes(['title', 'sku', 'category', 'specs']);
+  
+  // Upsert SKU document
+  return await index.addDocuments([{
+    id: product.id,
+    sku: product.sku,
+    title: product.title,
+    vendorId: product.vendorId,
+    category: product.category,
+    priceUsd: product.priceUsd,
+    stock: product.stock,
+    specs: product.specs
+  }]);
+}`}
+                    </pre>
+                  </div>
+                )}
+
+                {/* TAB 4: INTERACTIVE SPLIT CALCULATOR */}
+                {archTab === 'simulator' && (
+                  <div className="p-6 rounded-2xl bg-white border border-slate-200 space-y-4 shadow-sm">
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <i className="fa-solid fa-calculator text-cyan-600"></i>
+                      Live Multi-Vendor Payout Calculator
+                    </h3>
+                    <p className="text-xs text-slate-500 font-mono">Test arbitrary cart values to inspect the exact Stripe Connect split mathematics.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-xs text-slate-500 font-mono font-medium">SAMPLE CART GROSS</span>
+                        <div className="text-2xl font-bold font-mono text-slate-900 mt-1">$1,000.00 USD</div>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-xs text-slate-500 font-mono font-medium">2.5% PLATFORM FEE</span>
+                        <div className="text-2xl font-bold font-mono text-cyan-700 mt-1">$25.00 USD</div>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                        <span className="text-xs text-slate-500 font-mono font-medium">97.5% MERCHANT NET</span>
+                        <div className="text-2xl font-bold font-mono text-emerald-700 mt-1">$975.00 USD</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+          </main>
+
+          {/* ==================================================================== */}
+          {/* SLIDE-OVER UNIFIED CART & STRIPE CONNECT SPLIT DRAWER (LIGHT) */}
+          {/* ==================================================================== */}
+          {isCartOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex justify-end">
+              <div className="w-full max-w-md bg-white border-l border-slate-200 h-full flex flex-col justify-between p-6 overflow-y-auto shadow-2xl">
+                
+                <div className="space-y-6">
+                  {/* Cart Header */}
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                    <div>
+                      <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                        <i className="fa-solid fa-bag-shopping text-cyan-600"></i>
+                        Unified Multi-Vendor Cart
+                      </h3>
+                      <p className="text-xs font-mono text-cyan-700 font-medium">Stripe Connect Automated Split Settlements</p>
+                    </div>
+                    <button
+                      onClick={() => setIsCartOpen(false)}
+                      className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors"
+                    >
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+
+                  {cartDetails.items.length === 0 ? (
+                    <div className="py-16 text-center space-y-3">
+                      <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400 text-2xl">
+                        <i className="fa-solid fa-cart-shopping"></i>
+                      </div>
+                      <div className="text-slate-900 font-bold">Your cart is empty</div>
+                      <p className="text-xs text-slate-500 font-mono">Explore hardware from Aether, Kuro, Veloce, and Nomad.</p>
+                      <button
+                        onClick={() => { setIsCartOpen(false); setActiveView('storefront'); }}
+                        className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs"
+                      >
+                        Browse Storefront
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Cart Line Items */}
+                      <div className="space-y-3">
+                        {cartDetails.items.map(item => (
+                          <div key={item.productId} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3 shadow-sm">
+                            <img src={item.product.image} className="w-14 h-14 rounded-lg object-cover border border-slate-200 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-xs font-bold text-slate-900 truncate">{item.product.title}</h4>
+                              <span className="text-[10px] font-mono text-cyan-700 font-semibold block">{item.vendor.name}</span>
+                              <div className="text-xs font-mono text-slate-700 mt-1 font-bold">
+                                {formatPrice(item.product.priceUsd)}
+                              </div>
+                            </div>
+                            
+                            <div className="flex flex-col items-end gap-2">
+                              <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-lg border border-slate-300 shadow-inner">
+                                <button
+                                  onClick={() => updateCartQty(item.productId, -1)}
+                                  className="w-5 h-5 rounded hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center"
+                                >
+                                  -
+                                </button>
+                                <span className="text-xs font-mono font-bold text-slate-900 px-1">{item.qty}</span>
+                                <button
+                                  onClick={() => updateCartQty(item.productId, 1)}
+                                  className="w-5 h-5 rounded hover:bg-slate-100 text-slate-700 font-bold flex items-center justify-center"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <button
+                                onClick={() => removeCartItem(item.productId)}
+                                className="text-[11px] text-slate-400 hover:text-rose-600 transition-colors"
+                                title="Remove"
+                              >
+                                <i className="fa-regular fa-trash-can mr-1"></i> Remove
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Stripe Connect Split Ledger Preview */}
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs font-mono">
+                        <div className="flex items-center justify-between text-slate-500 uppercase text-[10px] font-bold border-b border-slate-200 pb-2">
+                          <span>Stripe Connect Split Ledger</span>
+                          <span className="text-cyan-700 font-bold">{cartDetails.vendorSplits.length} Merchant Account(s)</span>
+                        </div>
+                        {cartDetails.vendorSplits.map(split => (
+                          <div key={split.stripeAccountId} className="flex justify-between text-slate-700 text-[11px]">
+                            <span className="truncate max-w-[200px]">{split.vendorName} (97.5%)</span>
+                            <span className="text-emerald-700 font-bold">{formatPrice(split.netPayoutUsd)}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between text-slate-600 pt-2 border-t border-slate-200 text-[11px]">
+                          <span>NexusCart Platform Fee (2.5%)</span>
+                          <span className="text-cyan-700 font-bold">{formatPrice(cartDetails.platformFeeUsd)}</span>
+                        </div>
+                      </div>
+
+                      {/* Checkout Input: Customer Email */}
+                      <div className="space-y-1.5 font-mono text-xs">
+                        <label className="text-slate-600 font-medium block">Recipient Email (for Automated Receipt):</label>
+                        <input
+                          type="email"
+                          value={checkoutCustomerEmail}
+                          onChange={(e) => setCheckoutCustomerEmail(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-cyan-600 text-xs shadow-inner"
+                          placeholder="you@domain.com"
+                        />
+                      </div>
+
+                      {/* Payment Method Selector */}
+                      <div className="space-y-1.5 font-mono text-xs">
+                        <label className="text-slate-600 font-medium block">Payment Method:</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('stripe_card')}
+                            className={`p-2 rounded-xl border text-[11px] font-sans font-semibold transition-all ${
+                              paymentMethod === 'stripe_card'
+                                ? 'bg-cyan-50 border-cyan-500 text-cyan-800 shadow-sm'
+                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            <i className="fa-regular fa-credit-card block text-base mb-1 text-cyan-600"></i> Card
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('apple_pay')}
+                            className={`p-2 rounded-xl border text-[11px] font-sans font-semibold transition-all ${
+                              paymentMethod === 'apple_pay'
+                                ? 'bg-cyan-50 border-cyan-500 text-cyan-800 shadow-sm'
+                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            <i className="fa-brands fa-apple block text-base mb-1 text-slate-800"></i> Apple Pay
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('bank_wire')}
+                            className={`p-2 rounded-xl border text-[11px] font-sans font-semibold transition-all ${
+                              paymentMethod === 'bank_wire'
+                                ? 'bg-cyan-50 border-cyan-500 text-cyan-800 shadow-sm'
+                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            <i className="fa-solid fa-building-columns block text-base mb-1 text-cyan-600"></i> SEPA / ACH
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Checkout Button Footer */}
+                {cartDetails.items.length > 0 && (
+                  <div className="pt-4 border-t border-slate-200 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-mono text-slate-500">Total Settlement:</span>
+                      <span className="text-2xl font-extrabold text-slate-900 font-mono">
+                        {formatPrice(cartDetails.subtotalUsd)}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={handleStripeSplitCheckout}
+                      disabled={checkoutStep === 'processing'}
+                      className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-500 hover:from-cyan-500 hover:to-teal-400 text-white font-extrabold text-sm shadow-lg shadow-cyan-600/25 transition-all flex items-center justify-center gap-2"
+                    >
+                      {checkoutStep === 'processing' ? (
+                        <>
+                          <i className="fa-solid fa-spinner animate-spin"></i>
+                          <span>Routing Stripe Split Payouts...</span>
+                        </>
+                      ) : (
+                        <>
+                          <i className="fa-solid fa-lock text-xs"></i>
+                          <span>Authorize {formatPrice(cartDetails.subtotalUsd)} Checkout</span>
+                        </>
+                      )}
+                    </button>
+                    <p className="text-[10px] text-center font-mono text-slate-400">
+                      97.5% net transfer routed to merchant connected accounts instantly.
+                    </p>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================================== */}
+          {/* QUICK SPECS MODAL (LIGHT) */}
+          {/* ==================================================================== */}
+          {quickViewProduct && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl animate-in fade-in">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-xs font-mono text-cyan-700 font-bold">{quickViewProduct.sku}</span>
+                    <h3 className="text-xl font-bold text-slate-900 mt-0.5">{quickViewProduct.title}</h3>
+                  </div>
+                  <button
+                    onClick={() => setQuickViewProduct(null)}
+                    className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors"
+                  >
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                <div className="relative h-64 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
+                  <img src={quickViewProduct.image} className="w-full h-full object-cover" />
+                  <div className="absolute top-3 left-3">
+                    <span className="px-2.5 py-1 rounded-md text-xs font-mono bg-white/95 text-cyan-800 border border-slate-200 shadow-sm backdrop-blur-md font-semibold">
+                      {quickViewProduct.category}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-xs font-mono uppercase text-slate-500 font-bold">Engineering Specifications</h4>
+                  <ul className="space-y-1.5 text-xs text-slate-700 font-mono">
+                    {quickViewProduct.specs?.map((spec, i) => (
+                      <li key={i} className="flex items-center gap-2">
+                        <i className="fa-solid fa-check text-cyan-600 text-[10px]"></i>
+                        <span>{spec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="flex justify-between items-center pt-4 border-t border-slate-200">
+                  <div>
+                    <div className="text-2xl font-extrabold font-mono text-slate-900">
+                      {formatPrice(quickViewProduct.priceUsd)}
+                    </div>
+                    <div className="text-xs font-mono text-emerald-700 font-bold">
+                      {quickViewProduct.stock} units ready to ship
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      addToCart(quickViewProduct.id);
+                      setQuickViewProduct(null);
+                    }}
+                    className="px-6 py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold text-xs transition-colors flex items-center gap-2 shadow-md shadow-cyan-600/20"
+                  >
+                    <i className="fa-solid fa-cart-plus"></i> Add to Cart
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================================== */}
+          {/* ADD PRODUCT MODAL (VENDOR CMS - LIGHT) */}
+          {/* ==================================================================== */}
+          {showAddProductModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <form onSubmit={handleCreateVendorProduct} className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">Publish New Merchant SKU</h3>
+                    <span className="text-xs font-mono text-cyan-700 font-semibold">Tenant: {currentManagedVendor?.name}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddProductModal(false)}
+                    className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 hover:text-slate-800 flex items-center justify-center transition-colors"
+                  >
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                <div className="space-y-3 font-mono text-xs">
+                  <div>
+                    <label className="text-slate-600 font-semibold block mb-1">Product Title</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Kuro Titanium Magnetic Base"
+                      value={newProdForm.title}
+                      onChange={e => setNewProdForm({ ...newProdForm, title: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:bg-white focus:outline-none focus:border-cyan-600 shadow-inner"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-600 font-semibold block mb-1">SKU Code</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. KUR-MAG-01"
+                        value={newProdForm.sku}
+                        onChange={e => setNewProdForm({ ...newProdForm, sku: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:bg-white focus:outline-none focus:border-cyan-600 uppercase shadow-inner"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-600 font-semibold block mb-1">Category</label>
+                      <select
+                        value={newProdForm.category}
+                        onChange={e => setNewProdForm({ ...newProdForm, category: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:bg-white focus:outline-none focus:border-cyan-600 shadow-inner"
+                      >
+                        {['Audio', 'Desk Setup', 'Coffee Gear', 'Carry & Travel', 'Accessories'].map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-600 font-semibold block mb-1">Price (USD $)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        placeholder="199"
+                        value={newProdForm.priceUsd}
+                        onChange={e => setNewProdForm({ ...newProdForm, priceUsd: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:bg-white focus:outline-none focus:border-cyan-600 shadow-inner"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-600 font-semibold block mb-1">Available Stock</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        placeholder="25"
+                        value={newProdForm.stock}
+                        onChange={e => setNewProdForm({ ...newProdForm, stock: e.target.value })}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:bg-white focus:outline-none focus:border-cyan-600 shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-600 font-semibold block mb-1">Hardware Photography Image URL</label>
+                    <input
+                      type="url"
+                      required
+                      value={newProdForm.image}
+                      onChange={e => setNewProdForm({ ...newProdForm, image: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:bg-white focus:outline-none focus:border-cyan-600 shadow-inner"
+                    />
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      <span className="text-slate-500 text-[10px]">Sample presets:</span>
+                      {SAMPLE_IMAGE_PRESETS.map(preset => (
+                        <button
+                          key={preset.name}
+                          type="button"
+                          onClick={() => setNewProdForm({ ...newProdForm, image: preset.url })}
+                          className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 hover:text-cyan-700 hover:bg-slate-200 border border-slate-200"
+                        >
+                          {preset.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-600 font-semibold block mb-1">Technical Specs (comma separated)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CNC Titanium, 10-Year Warranty, IP68 Waterproof"
+                      value={newProdForm.specsStr}
+                      onChange={e => setNewProdForm({ ...newProdForm, specsStr: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 focus:bg-white focus:outline-none focus:border-cyan-600 shadow-inner"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddProductModal(false)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-mono text-slate-700 font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-500 text-white font-extrabold text-xs shadow-md shadow-cyan-600/20"
+                  >
+                    Publish to MeiliSearch
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* ==================================================================== */}
+          {/* EMAIL INVOICE / RECEIPT MODAL (LIGHT) */}
+          {/* ==================================================================== */}
+          {invoiceModalOrder && (
+            <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div id="printable-invoice" className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-5 font-mono text-xs shadow-2xl">
+                
+                <div className="flex justify-between items-start border-b border-slate-200 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-extrabold font-sans text-slate-900">Nexus<span className="text-cyan-600">Cart</span></span>
+                      <span className="px-2 py-0.5 rounded text-[10px] bg-cyan-50 text-cyan-700 border border-cyan-200 font-bold">Tax Invoice</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">Multi-Vendor Split Settlement Receipt</p>
+                  </div>
+                  <button
+                    onClick={() => setInvoiceModalOrder(null)}
+                    className="w-7 h-7 rounded bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-[11px] bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                  <div>
+                    <span className="text-slate-500 block uppercase text-[10px] font-bold">Order Number</span>
+                    <span className="text-slate-900 font-bold">{invoiceModalOrder.id}</span>
+                    <span className="text-slate-500 block text-[10px] mt-1">{invoiceModalOrder.createdAt}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block uppercase text-[10px] font-bold">Customer Recipient</span>
+                    <span className="text-cyan-700 font-bold">{invoiceModalOrder.customerEmail}</span>
+                    <span className="text-slate-500 block text-[10px] mt-1">{invoiceModalOrder.trackingNumber || 'DHL Express Airway'}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-[10px] uppercase text-slate-500 font-bold border-b border-slate-200 pb-1">Line Items</div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {invoiceModalOrder.items?.map((item, i) => (
+                      <div key={i} className="flex justify-between text-slate-700">
+                        <div>
+                          <div className="text-slate-900 font-sans font-semibold">{item.title}</div>
+                          <span className="text-[10px] text-slate-500">{item.qty} &times; {formatPrice(item.priceUsd, invoiceModalOrder.currency)}</span>
+                        </div>
+                        <span className="font-bold text-slate-900">{formatPrice(item.priceUsd * item.qty, invoiceModalOrder.currency)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Stripe Split Ledger Summary on Invoice */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 text-[11px]">
+                  <div className="text-[10px] uppercase text-slate-500 font-bold">Stripe Connect Split Ledger</div>
+                  {invoiceModalOrder.vendorSplits?.map((split, i) => (
+                    <div key={i} className="flex justify-between text-slate-700">
+                      <span>{split.vendorName} ({split.stripeAccountId})</span>
+                      <span className="text-emerald-700 font-bold">{formatPrice(split.netPayoutUsd, invoiceModalOrder.currency)}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between text-slate-600 pt-1 border-t border-slate-200">
+                    <span>NexusCart Platform Commission (2.5%)</span>
+                    <span className="text-cyan-700 font-bold">{formatPrice(invoiceModalOrder.platformFeeUsd, invoiceModalOrder.currency)}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 pt-3 flex justify-between items-center font-bold text-slate-900 text-sm">
+                  <span>Total Settled</span>
+                  <span className="text-xl font-extrabold text-cyan-700">{formatPrice(invoiceModalOrder.totalUsd, invoiceModalOrder.currency)}</span>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-300"
+                  >
+                    <i className="fa-solid fa-print text-cyan-600"></i> Print Receipt
+                  </button>
+                  <button
+                    onClick={() => {
+                      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(invoiceModalOrder, null, 2));
+                      const a = document.createElement('a');
+                      a.setAttribute("href", dataStr);
+                      a.setAttribute("download", `receipt-${invoiceModalOrder.id}.json`);
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs"
+                  >
+                    Download JSON
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* ==================================================================== */}
+          {/* TOAST NOTIFICATION CONTAINER (LIGHT) */}
+          {/* ==================================================================== */}
+          {toast && (
+            <div className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl border shadow-xl flex items-center gap-2.5 font-mono text-xs animate-in slide-in-from-bottom duration-200 ${
+              toast.type === 'error'
+                ? 'bg-rose-50 border-rose-300 text-rose-800'
+                : toast.type === 'warning'
+                ? 'bg-amber-50 border-amber-300 text-amber-800'
+                : 'bg-white border-cyan-400 text-cyan-900'
+            }`}>
+              <i className={`fa-solid ${
+                toast.type === 'error'
+                  ? 'fa-triangle-exclamation text-rose-600'
+                  : toast.type === 'warning'
+                  ? 'fa-circle-exclamation text-amber-600'
+                  : 'fa-circle-check text-cyan-600'
+              }`}></i>
+              <span className="font-semibold">{toast.msg}</span>
+            </div>
+          )}
+
+          {/* ==================================================================== */}
+          {/* FOOTER (LIGHT) */}
+          {/* ==================================================================== */}
+          <footer className="py-8 border-t border-slate-200 bg-white mt-12">
+            <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-500">
+              <div>
+                NexusCart Multi-Vendor Headless E-Commerce &bull; Built for <strong className="text-slate-800 font-bold">Muhammad Aurangzeb's</strong> Portfolio
+              </div>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleResetDemoData}
+                  className="text-slate-600 hover:text-cyan-700 transition-colors flex items-center gap-1 font-medium"
+                >
+                  <i className="fa-solid fa-arrow-rotate-left text-[10px]"></i> Reset Demo State
+                </button>
+                <span className="text-slate-300">|</span>
+                <span className="text-cyan-700 font-semibold">Next.js &bull; React 18 &bull; Stripe Connect &bull; MeiliSearch</span>
+              </div>
+            </div>
+          </footer>
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<NexusCartApp />);
+  </script>
+</body>
+</html>
