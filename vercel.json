@@ -1,8 +1,7 @@
 {
   "version": 2,
+  "outputDirectory": "public",
   "cleanUrls": true,
-  "trailingSlash": false,
-  "buildCommand": "node build.js",
   "rewrites": [
     {
       "source": "/(.*)",

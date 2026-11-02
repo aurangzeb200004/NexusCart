@@ -24,7 +24,7 @@ const MIME_TYPES = {
   '.md': 'text/markdown; charset=utf-8'
 };
 
-const server = http.createServer((req, res) => {
+function requestHandler(req, res) {
   // Normalize URL
   let parsedUrl = req.url.split('?')[0];
   if (parsedUrl === '/' || parsedUrl === '') {
@@ -65,18 +65,23 @@ const server = http.createServer((req, res) => {
       res.end(content);
     });
   });
-});
+}
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n========================================================`);
-  console.log(`⚡ NexusCart Headless E-Commerce Platform is RUNNING!`);
-  console.log(`--------------------------------------------------------`);
-  console.log(`🔗 Local URL:    http://localhost:${PORT}`);
-  console.log(`📦 Architecture: React 18 + Tailwind + MeiliSearch + Stripe`);
-  console.log(`========================================================\n`);
-});
+// Export handler
+module.exports = requestHandler;
 
-// Graceful shutdown handling
-process.on('SIGTERM', () => server.close());
-process.on('SIGINT', () => server.close());
+// Standalone execution
+if (require.main === module) {
+  const server = http.createServer(requestHandler);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n========================================================`);
+    console.log(`⚡ NexusCart Headless E-Commerce Platform is RUNNING!`);
+    console.log(`--------------------------------------------------------`);
+    console.log(`🔗 Local URL:    http://localhost:${PORT}`);
+    console.log(`📦 Architecture: React 18 + Tailwind + MeiliSearch + Stripe`);
+    console.log(`========================================================\n`);
+  });
 
+  process.on('SIGTERM', () => server.close());
+  process.on('SIGINT', () => server.close());
+}

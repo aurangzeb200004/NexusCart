@@ -13,3 +13,4 @@ const indexSrc = path.join(rootDir, 'index.html');
 });
 
 console.log('✓ Vercel build successful: index.html synced to root, public/, dist/, and build/');
+

@@ -56,7 +56,7 @@ npm start
 # or
 npm run dev
 # or
-node server.js
+node local-server.js
 ```
 Then open your browser to **[http://localhost:3000](http://localhost:3000)**.
 
@@ -76,7 +76,7 @@ Simply double-click or open **`index.html`** in any modern web browser! Everythi
 ```text
 nexuscart-platform/
 ├── index.html              # Standalone, zero-build React 18 application with Tailwind CSS
-├── server.js               # Zero-dependency Node.js HTTP server (port 3000)
+├── local-server.js         # Zero-dependency Node.js HTTP server (port 3000)
 ├── package.json            # Scripts & project manifest
 ├── README.md               # Architecture documentation & quick-start guide
 ├── src/
